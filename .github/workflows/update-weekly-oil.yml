@@ -15,40 +15,38 @@ jobs:
       - name: Create data folder if missing
         run: mkdir -p data
 
-      - name: Install dependencies
-        run: |
-          npm install axios cheerio
+      - name: Install Python dependencies
+        run: pip install requests beautifulsoup4
 
       - name: Scrape and download latest XLSX
         run: |
-          node <<EOF
-          const axios = require('axios');
-          const cheerio = require('cheerio');
-          const fs = require('fs');
-          const https = require('https');
+          python <<EOF
+          import requests
+          from bs4 import BeautifulSoup
+          import os
 
-          const url = 'https://energy.ec.europa.eu/data-and-analysis/weekly-oil-bulletin_en';
+          url = 'https://energy.ec.europa.eu/data-and-analysis/weekly-oil-bulletin_en'
+          base = 'https://energy.ec.europa.eu'
 
-          axios.get(url).then(res => {
-            const $ = cheerio.load(res.data);
-            const link = $('a')
-              .filter((i, el) => $(el).text().toLowerCase().includes('prices with taxes') && $(el).attr('href')?.endsWith('.xlsx'))
-              .first()
-              .attr('href');
+          response = requests.get(url)
+          soup = BeautifulSoup(response.text, 'html.parser')
 
-            if (!link) throw new Error('XLSX link not found');
+          link = None
+          for a in soup.find_all('a', href=True):
+              text = a.get_text(strip=True).lower()
+              href = a['href']
+              if 'prices with taxes' in text and href.endswith('.xlsx'):
+                  link = href
+                  break
 
-            const fileUrl = link.startsWith('http') ? link : `https://energy.ec.europa.eu${link}`;
-            const file = fs.createWriteStream('data/latest.xlsx');
+          if not link:
+              raise Exception('XLSX link not found')
 
-            https.get(fileUrl, response => {
-              response.pipe(file);
-              file.on('finish', () => file.close());
-            });
-          }).catch(err => {
-            console.error('Scraping failed:', err);
-            process.exit(1);
-          });
+          full_url = link if link.startswith('http') else base + link
+          file_response = requests.get(full_url)
+
+          with open('data/latest.xlsx', 'wb') as f:
+              f.write(file_response.content)
           EOF
 
       - name: Commit and push updated file
