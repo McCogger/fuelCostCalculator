@@ -1,7 +1,7 @@
 name: Parse Fuel Price
 
 on:
-  workflow_dispatch:  # Manual trigger only for testing
+  workflow_dispatch:  # Manual trigger for testing
 
 jobs:
   parse-fuel-price:
@@ -19,13 +19,13 @@ jobs:
       - name: Install dependencies
         run: npm install xlsx
 
-      - name: Create parser script
+      - name: Create parser script using require()
         run: |
           mkdir -p scripts
           cat << 'EOF' > scripts/generateFuelPriceJson.js
-          import * as XLSX from 'xlsx'
-          import fs from 'fs'
-          import path from 'path'
+          const XLSX = require('xlsx')
+          const fs = require('fs')
+          const path = require('path')
 
           const inputPath = path.join('data', 'latest.xlsx')
           const outputPath = path.join('data', 'fuel-price.json')
