@@ -2,13 +2,12 @@ name: Update Weekly Oil Bulletin
 
 on:
   schedule:
-    - cron: '0 8 * * 4'  # Every Thursday at 08:00 UTC
-  workflow_dispatch:     # Allows manual triggering
+    - cron: '0 8 * * 4' # Ogni giovedì alle 08:00 UTC
+  workflow_dispatch:
 
 jobs:
   download-weekly-oil:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -16,9 +15,41 @@ jobs:
       - name: Create data folder if missing
         run: mkdir -p data
 
-      - name: Download XLSX file
+      - name: Install dependencies
         run: |
-          curl -L -o data/latest.xlsx https://energy.ec.europa.eu/system/files/weekly_oil_bulletin_prices.xlsx
+          npm install axios cheerio
+
+      - name: Scrape and download latest XLSX
+        run: |
+          node <<EOF
+          const axios = require('axios');
+          const cheerio = require('cheerio');
+          const fs = require('fs');
+          const https = require('https');
+
+          const url = 'https://energy.ec.europa.eu/data-and-analysis/weekly-oil-bulletin_en';
+
+          axios.get(url).then(res => {
+            const $ = cheerio.load(res.data);
+            const link = $('a')
+              .filter((i, el) => $(el).text().toLowerCase().includes('prices with taxes') && $(el).attr('href')?.endsWith('.xlsx'))
+              .first()
+              .attr('href');
+
+            if (!link) throw new Error('XLSX link not found');
+
+            const fileUrl = link.startsWith('http') ? link : `https://energy.ec.europa.eu${link}`;
+            const file = fs.createWriteStream('data/latest.xlsx');
+
+            https.get(fileUrl, response => {
+              response.pipe(file);
+              file.on('finish', () => file.close());
+            });
+          }).catch(err => {
+            console.error('Scraping failed:', err);
+            process.exit(1);
+          });
+          EOF
 
       - name: Commit and push updated file
         run: |
