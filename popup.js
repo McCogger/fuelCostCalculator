@@ -1,15 +1,15 @@
-//Things to do once popup has loaded
 document.addEventListener('DOMContentLoaded', function () {
-  var efficiencyInput = document.getElementById('efficiency')
-  var efficiencyUnitSelect = document.getElementById('efficiencyUnit')
-  var fuelPriceInput = document.getElementById('fuelPrice')
-  var priceUnitSelect = document.getElementById('priceUnit')
-  var currencySelect = document.getElementById('currency')
-  var mapUnitSelect = document.getElementById('mapUnit')
-  var saveButton = document.getElementById('saveButton')
-  var autoPriceCheckbox = document.getElementById('autoPrice')
+  var efficiencyInput = document.getElementById('efficiency');
+  var efficiencyUnitSelect = document.getElementById('efficiencyUnit');
+  var fuelPriceInput = document.getElementById('fuelPrice');
+  var priceUnitSelect = document.getElementById('priceUnit');
+  var currencySelect = document.getElementById('currency');
+  var mapUnitSelect = document.getElementById('mapUnit');
+  var autoFuelCheckbox = document.getElementById('autoFuelPrice');
+  var saveButton = document.getElementById('saveButton');
+  var saveMessage = document.getElementById('saveMessage');
 
-  // Fetch and pre-fill the form with previously saved values
+  // Recupera i valori salvati
   chrome.storage.sync.get([
     'efficiencyInputted',
     'efficiencyUnit',
@@ -19,85 +19,77 @@ document.addEventListener('DOMContentLoaded', function () {
     'mapUnit',
     'costPerKilometre',
     'costPerMile',
+    'autoFuelEnabled'
   ], function (items) {
     if (items.efficiencyInputted) {
-      efficiencyInput.value = items.efficiencyInputted
+      efficiencyInput.value = items.efficiencyInputted;
     }
     if (items.efficiencyUnit) {
-      efficiencyUnitSelect.value = items.efficiencyUnit
+      efficiencyUnitSelect.value = items.efficiencyUnit;
     }
     if (items.fuelPrice) {
-      fuelPriceInput.value = items.fuelPrice
+      fuelPriceInput.value = items.fuelPrice;
     }
     if (items.priceUnit) {
-      priceUnitSelect.value = items.priceUnit
+      priceUnitSelect.value = items.priceUnit;
     }
     if (items.currency) {
-      currencySelect.value = items.currency
+      currencySelect.value = items.currency;
     }
     if (items.mapUnit) {
-      mapUnitSelect.value = items.mapUnit
+      mapUnitSelect.value = items.mapUnit;
     }
-
-    // Se la checkbox è attiva, carica il prezzo da fuel-price.json
-    if (autoPriceCheckbox && autoPriceCheckbox.checked) {
-      fetch(chrome.runtime.getURL('data/fuel-price.json'))
-        .then(response => response.json())
-        .then(data => {
-          if (data.fuel_price) {
-            const pricePerLiter = data.fuel_price / 1000
-            fuelPriceInput.value = pricePerLiter.toFixed(3)
-          }
-        })
-        .catch(err => {
-          console.error('Errore nel caricamento del prezzo carburante:', err)
-        })
+    if (items.autoFuelEnabled !== undefined) {
+      autoFuelCheckbox.checked = items.autoFuelEnabled;
     }
-  })
+  });
 
-  // Do the conversions
+  // Salva i dati al click
   saveButton.addEventListener('click', function () {
-    var efficiencyInputted = parseFloat(document.getElementById('efficiency').value)
-    var efficiencyUnit = document.getElementById('efficiencyUnit').value
-    var fuelPrice = parseFloat(document.getElementById('fuelPrice').value)
-    var priceUnit = document.getElementById('priceUnit').value
-    var currency = document.getElementById('currency').value
-    var mapUnit = document.getElementById('mapUnit').value
-    var costPerMile, costPerKilometre
+    var efficiencyInputted = parseFloat(efficiencyInput.value);
+    var efficiencyUnit = efficiencyUnitSelect.value;
+    var fuelPrice = parseFloat(fuelPriceInput.value);
+    var priceUnit = priceUnitSelect.value;
+    var currency = currencySelect.value;
+    var mapUnit = mapUnitSelect.value;
+    var autoFuelEnabled = autoFuelCheckbox.checked;
+
+    var costPerMile, costPerKilometre;
 
     // Conversion factors
-    const mpgUsToKpl = 0.425144
-    const mpgUkToKpl = 0.354006
-    const literToUSGallon = 3.785411784
-    const literToUKGallon = 4.54609
-    const mileToKilometre = 1.609344
+    const mpgUsToKpl = 0.425144;
+    const mpgUkToKpl = 0.354006;
+    const literToUSGallon = 3.785411784;
+    const literToUKGallon = 4.54609;
+    const mileToKilometre = 1.609344;
 
     // Convert efficiency to KPL
+    let efficiency;
     if (efficiencyUnit === 'mpg_us') {
-      efficiency = efficiencyInputted * mpgUsToKpl
+      efficiency = efficiencyInputted * mpgUsToKpl;
     } else if (efficiencyUnit === 'mpg_uk') {
-      efficiency = efficiencyInputted * mpgUkToKpl
+      efficiency = efficiencyInputted * mpgUkToKpl;
     } else if (efficiencyUnit === 'l_per_100_km') {
-      efficiency = 100 / efficiencyInputted
+      efficiency = 100 / efficiencyInputted;
     } else {
-      efficiency = efficiencyInputted
+      efficiency = efficiencyInputted;
     }
 
     // Convert fuel price to price per liter
-    var fuelPricePerliter
+    let fuelPricePerliter;
     if (priceUnit === 'us_gallon') {
-      fuelPricePerliter = fuelPrice / literToUSGallon
+      fuelPricePerliter = fuelPrice / literToUSGallon;
     } else if (priceUnit === 'uk_gallon') {
-      fuelPricePerliter = fuelPrice / literToUKGallon
+      fuelPricePerliter = fuelPrice / literToUKGallon;
     } else {
-      fuelPricePerliter = fuelPrice
+      fuelPricePerliter = fuelPrice;
     }
 
-    // Calculate cost per kilometre and cost per mile
-    costPerKilometre = fuelPricePerliter / efficiency
-    costPerMile = costPerKilometre * mileToKilometre
+    // Calculate cost
+    costPerKilometre = fuelPricePerliter / efficiency;
+    costPerMile = costPerKilometre * mileToKilometre;
 
-    // Save settings and computed costs as floats
+    // Salva tutto
     chrome.storage.sync.set({
       efficiency: efficiency,
       efficiencyInputted: efficiencyInputted,
@@ -108,15 +100,14 @@ document.addEventListener('DOMContentLoaded', function () {
       mapUnit: mapUnit,
       costPerKilometre: costPerKilometre.toFixed(6),
       costPerMile: costPerMile.toFixed(6),
-    }, function () {
-      //maybe delete
-    })
+      autoFuelEnabled: autoFuelEnabled
+    });
 
-    // Display the "Saved" message
-    saveMessage.textContent = 'Saved! Refresh Google Maps to see changes'
-    saveMessage.style.display = 'inline'
+    // Messaggio di conferma
+    saveMessage.textContent = 'Saved! Refresh Google Maps to see changes';
+    saveMessage.style.display = 'inline';
     setTimeout(function () {
-      saveMessage.style.display = 'none'
-    }, 5000)
-  })
-})
+      saveMessage.style.display = 'none';
+    }, 5000);
+  });
+});
