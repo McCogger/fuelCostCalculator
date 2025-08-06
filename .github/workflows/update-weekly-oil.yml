@@ -1,0 +1,29 @@
+name: Update Weekly Oil Bulletin
+
+on:
+  schedule:
+    - cron: '0 8 * * 4'  # Every Thursday at 08:00 UTC
+  workflow_dispatch:     # Allows manual triggering
+
+jobs:
+  download-weekly-oil:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Create data folder if missing
+        run: mkdir -p data
+
+      - name: Download XLSX file
+        run: |
+          curl -L -o data/latest.xlsx https://energy.ec.europa.eu/system/files/weekly_oil_bulletin_prices.xlsx
+
+      - name: Commit and push updated file
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add data/latest.xlsx
+          git commit -m "Auto-update Weekly Oil Bulletin"
+          git push
