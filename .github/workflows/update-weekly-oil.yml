@@ -1,58 +1,31 @@
-name: Update Weekly Oil Bulletin
+- name: Scrape and download latest XLSX
+  run: |
+    python <<EOF
+    import requests
+    from bs4 import BeautifulSoup
+    import os
 
-on:
-  schedule:
-    - cron: '0 8 * * 4' # Ogni giovedì alle 08:00 UTC
-  workflow_dispatch:
+    url = 'https://energy.ec.europa.eu/data-and-analysis/weekly-oil-bulletin_en'
+    base = 'https://energy.ec.europa.eu'
 
-jobs:
-  download-weekly-oil:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, 'html.parser')
 
-      - name: Create data folder if missing
-        run: mkdir -p data
+    links = [a['href'] for a in soup.find_all('a', href=True) if a['href'].endswith('.xlsx')]
+    print("Found XLSX links:")
+    for l in links:
+        print("-", l)
 
-      - name: Install Python dependencies
-        run: pip install requests beautifulsoup4
+    # Cerca il primo link che contiene 'taxes'
+    link = next((l for l in links if 'taxes' in l.lower()), None)
 
-      - name: Scrape and download latest XLSX
-        run: |
-          python <<EOF
-          import requests
-          from bs4 import BeautifulSoup
-          import os
+    if not link:
+        raise Exception('XLSX link not found')
 
-          url = 'https://energy.ec.europa.eu/data-and-analysis/weekly-oil-bulletin_en'
-          base = 'https://energy.ec.europa.eu'
+    full_url = link if link.startswith('http') else base + link
+    print("Downloading from:", full_url)
 
-          response = requests.get(url)
-          soup = BeautifulSoup(response.text, 'html.parser')
-
-          link = None
-          for a in soup.find_all('a', href=True):
-              text = a.get_text(strip=True).lower()
-              href = a['href']
-              if 'prices with taxes' in text and href.endswith('.xlsx'):
-                  link = href
-                  break
-
-          if not link:
-              raise Exception('XLSX link not found')
-
-          full_url = link if link.startswith('http') else base + link
-          file_response = requests.get(full_url)
-
-          with open('data/latest.xlsx', 'wb') as f:
-              f.write(file_response.content)
-          EOF
-
-      - name: Commit and push updated file
-        run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-          git add data/latest.xlsx
-          git commit -m "Auto-update Weekly Oil Bulletin"
-          git push
+    file_response = requests.get(full_url)
+    with open('data/latest.xlsx', 'wb') as f:
+        f.write(file_response.content)
+    EOF
